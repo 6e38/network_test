@@ -47,13 +47,15 @@ def receive_data(connection):
 
 def send_data(connection):
     print("Sending data...")
+    counter = 0
     while running:
-        connection.send('''This is the data that never ends,
+        connection.send('''{}: This is the data that never ends,
 Yes it goes on and on my friend,
 Some people started sending it not knowing what it was,
 And they'll keep sending it forever just because...
-'''.encode('UTF-8'))
-        time.sleep(0.1)
+'''.format(counter).encode('UTF-8'))
+        counter += 1
+        time.sleep(0.001)
 
 
 def main(argv):
