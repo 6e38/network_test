@@ -1,10 +1,11 @@
 # Copyright (c) 2020, Nathan Jenne
-# Slow traffic sender/receiver
+# Fast traffic sender
 
 import signal
 import socket
 import sys
 import time
+from datetime import datetime
 
 
 running = True
@@ -13,13 +14,18 @@ direction = 'up'
 
 def serve(port):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((socket.gethostname(), port))
+    server.settimeout(3)
+    server.bind(('localhost', port))
+    # server.bind((socket.gethostname(), port))
     server.listen(2)
 
-    print("Listening on port {}".format(port))
+    print('Listening on port {}, <ctrl-c> to stop'.format(port))
     while running:
-        connection, addr = server.accept()
-        print("Received connection from {}".format(addr))
+        try:
+            connection, addr = server.accept()
+        except socket.timeout:
+            continue
+        print('Received connection from {}'.format(addr))
         if direction == 'up':
             receive_data(connection)
         else:
@@ -28,8 +34,13 @@ def serve(port):
 
 def connect(host, port):
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    connection.connect((host, port))
-    print("Connecting to {}:{}".format(host, port))
+    connection.settimeout(5)
+    try:
+        connection.connect((host, port))
+    except socket.timeout:
+        print('failed to connect to server')
+        return
+    print('Connecting to {}:{}'.format(host, port))
     if direction == 'up':
         send_data(connection)
     else:
@@ -37,16 +48,23 @@ def connect(host, port):
 
 
 def receive_data(connection):
-    print("Receiving data...")
+    print('Receiving data...')
+    bytesReceived = 0
+    start = datetime.now()
     while running:
         b = connection.recv(1024)
         if len(b) == 0:
             break
+        bytesReceived += len(b)
         # print(b.decode('UTF-8'))
+    end = datetime.now()
+    delta = end - start
+    mbitsPerSecond = (bytesReceived * 8 / 1000000) / delta.seconds
+    print(f'bytes received {bytesReceived} in {delta.seconds}\nMbps {mbitsPerSecond}')
 
 
 def send_data(connection):
-    print("Sending data...")
+    print('Sending data...')
     counter = 0
     while running:
         connection.send('''{}: This is the data that never ends,
@@ -55,7 +73,6 @@ Some people started sending it not knowing what it was,
 And they'll keep sending it forever just because...
 '''.format(counter).encode('UTF-8'))
         counter += 1
-        time.sleep(0.001)
 
 
 def main(argv):
@@ -74,20 +91,24 @@ def main(argv):
             port = int(args[0])
             serve(port)
         else:
-            print("Must provide port")
+            print('Must provide port')
     else:
         if len(args) >= 2:
             host = args[0]
             port = int(args[1])
             connect(host, port)
         else:
-            print("Must provide host & port")
+            print('Must provide host & port')
 
 
 def sig_handler(__, _):
+    print('teminating connections')
     global running
     running = False
+    time.sleep(3.1)
+    print('quitting')
+    quit()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main(sys.argv)
